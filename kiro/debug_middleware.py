@@ -95,7 +95,11 @@ class DebugLoggerMiddleware(BaseHTTPMiddleware):
         
         # Initialize debug logging for this request
         # This sets up buffers and creates a loguru sink to capture app logs
-        debug_logger.prepare_new_request()
+        # Also creates a RequestRecord for Dashboard (always, even if DEBUG_MODE=off)
+        debug_logger.prepare_new_request(
+            endpoint=request.url.path,
+            method=request.method
+        )
         
         # Read and log the raw request body
         # FastAPI caches the body after first read, so this is safe

@@ -35,11 +35,99 @@ them to app_logs.txt file for debugging convenience.
 import io
 import json
 import shutil
+import time
+import threading
+import uuid
+from collections import deque
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from kiro.config import DEBUG_MODE, DEBUG_DIR
+
+
+# Maximum number of request records kept in memory
+MAX_HISTORY = 50
+
+
+@dataclass
+class RequestRecord:
+    """
+    Complete record of a single API request for the Debug Dashboard.
+    
+    Stores the full lifecycle: client request → kiro request → response → logs.
+    """
+    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    timestamp: float = field(default_factory=time.time)
+    endpoint: str = ""
+    method: str = ""
+    client_request_body: str = ""
+    kiro_request_body: str = ""
+    response_raw: str = ""
+    response_modified: str = ""
+    app_logs: str = ""
+    error_info: Optional[Dict[str, Any]] = None
+    status_code: int = 0
+    duration_ms: float = 0
+    completed: bool = False
+    
+    def to_summary(self) -> Dict[str, Any]:
+        """Return a lightweight summary for the history list."""
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp,
+            "endpoint": self.endpoint,
+            "method": self.method,
+            "status_code": self.status_code,
+            "duration_ms": round(self.duration_ms, 1),
+            "has_error": self.error_info is not None,
+        }
+    
+    def to_detail(self) -> Dict[str, Any]:
+        """Return the full record for detail view."""
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp,
+            "endpoint": self.endpoint,
+            "method": self.method,
+            "status_code": self.status_code,
+            "duration_ms": round(self.duration_ms, 1),
+            "client_request_body": self.client_request_body,
+            "kiro_request_body": self.kiro_request_body,
+            "response_raw": self.response_raw,
+            "response_modified": self.response_modified,
+            "app_logs": self.app_logs,
+            "error_info": self.error_info,
+        }
+
+
+# Global SSE subscribers list (asyncio.Queue instances)
+_sse_subscribers: List[Any] = []
+_sse_lock = threading.Lock()
+
+
+def add_sse_subscriber(queue) -> None:
+    with _sse_lock:
+        _sse_subscribers.append(queue)
+
+
+def remove_sse_subscriber(queue) -> None:
+    with _sse_lock:
+        try:
+            _sse_subscribers.remove(queue)
+        except ValueError:
+            pass
+
+
+def _notify_sse_subscribers(record: RequestRecord) -> None:
+    """Push a new record summary to all SSE subscribers."""
+    with _sse_lock:
+        for q in _sse_subscribers:
+            try:
+                q.put_nowait(record.to_summary())
+            except Exception:
+                pass
 
 
 class DebugLogger:
@@ -47,9 +135,12 @@ class DebugLogger:
     Singleton for managing debug request logs.
     
     Operating modes:
-    - off: does nothing
+    - off: does nothing (but still records to history for Dashboard)
     - errors: buffers data, flushes to files only on errors
     - all: writes data immediately to files (as before)
+    
+    The in-memory request history is ALWAYS active (regardless of DEBUG_MODE)
+    so the Dashboard can show request/response data.
     """
     _instance = None
 
@@ -74,6 +165,11 @@ class DebugLogger:
         # Buffer for application logs (loguru)
         self._app_logs_buffer: io.StringIO = io.StringIO()
         self._loguru_sink_id: Optional[int] = None
+        
+        # In-memory request history (always active)
+        self._request_history: deque = deque(maxlen=MAX_HISTORY)
+        self._current_record: Optional[RequestRecord] = None
+        self._request_start_time: float = 0
     
     def _is_enabled(self) -> bool:
         """Checks if logging is enabled."""
@@ -126,14 +222,19 @@ class DebugLogger:
             # No filter - capture ALL logs during request processing
         )
 
-    def prepare_new_request(self):
+    def prepare_new_request(self, endpoint: str = "", method: str = ""):
         """
         Prepares the logger for a new request.
         
         In "all" mode: clears the logs folder.
         In "errors" mode: clears buffers.
         In both modes: sets up application log capture.
+        Always creates a new RequestRecord for Dashboard history.
         """
+        # Always create a new record for Dashboard (even if file logging is off)
+        self._current_record = RequestRecord(endpoint=endpoint, method=method)
+        self._request_start_time = time.time()
+        
         if not self._is_enabled():
             return
         
@@ -159,7 +260,17 @@ class DebugLogger:
         
         In "all" mode: writes immediately to file.
         In "errors" mode: buffers.
+        Always saves to current record for Dashboard.
         """
+        # Always save to current record
+        if self._current_record is not None:
+            try:
+                self._current_record.client_request_body = json.dumps(
+                    json.loads(body), indent=2, ensure_ascii=False
+                )
+            except (json.JSONDecodeError, Exception):
+                self._current_record.client_request_body = body.decode("utf-8", errors="replace")
+        
         if not self._is_enabled():
             return
 
@@ -175,7 +286,17 @@ class DebugLogger:
         
         In "all" mode: writes immediately to file.
         In "errors" mode: buffers.
+        Always saves to current record for Dashboard.
         """
+        # Always save to current record
+        if self._current_record is not None:
+            try:
+                self._current_record.kiro_request_body = json.dumps(
+                    json.loads(body), indent=2, ensure_ascii=False
+                )
+            except (json.JSONDecodeError, Exception):
+                self._current_record.kiro_request_body = body.decode("utf-8", errors="replace")
+        
         if not self._is_enabled():
             return
 
@@ -191,7 +312,12 @@ class DebugLogger:
         
         In "all" mode: writes immediately to file.
         In "errors" mode: buffers.
+        Always appends to current record for Dashboard.
         """
+        # Always save to current record
+        if self._current_record is not None:
+            self._current_record.response_raw += chunk.decode("utf-8", errors="replace")
+        
         if not self._is_enabled():
             return
 
@@ -207,7 +333,12 @@ class DebugLogger:
         
         In "all" mode: writes immediately to file.
         In "errors" mode: buffers.
+        Always appends to current record for Dashboard.
         """
+        # Always save to current record
+        if self._current_record is not None:
+            self._current_record.response_modified += chunk.decode("utf-8", errors="replace")
+        
         if not self._is_enabled():
             return
 
@@ -254,11 +385,23 @@ class DebugLogger:
         
         In "errors" mode: flushes buffers and saves error_info.
         In "all" mode: only saves error_info (data already written).
+        Also finalizes current record for Dashboard.
         
         Args:
             status_code: HTTP error status code
             error_message: Error message (optional)
         """
+        # Always update current record with error info
+        if self._current_record is not None:
+            self._current_record.error_info = {
+                "status_code": status_code,
+                "error_message": error_message
+            }
+            self._current_record.status_code = status_code
+        
+        # Finalize record for Dashboard
+        self._finalize_record()
+        
         if not self._is_enabled():
             return
         
@@ -315,19 +458,58 @@ class DebugLogger:
             # Clear buffers after flush
             self._clear_buffers()
     
-    def discard_buffers(self):
+    def discard_buffers(self, status_code: int = 200):
         """
         Clears buffers without writing to files.
         
         Called when request completed successfully in "errors" mode.
         Also called in "all" mode to save logs of successful request.
+        Also finalizes current record for Dashboard.
         """
+        # Finalize record for Dashboard
+        if self._current_record is not None:
+            self._current_record.status_code = status_code
+        self._finalize_record()
+        
         if DEBUG_MODE == "errors":
             self._clear_buffers()
         elif DEBUG_MODE == "all":
             # In "all" mode save logs even for successful requests
             self._write_app_logs_to_file()
             self._clear_app_logs_buffer()
+    
+    # ==================== Dashboard History Methods ====================
+    
+    def _finalize_record(self):
+        """Finalize current record and add to history."""
+        if self._current_record is None:
+            return
+        
+        record = self._current_record
+        record.duration_ms = (time.time() - self._request_start_time) * 1000
+        record.app_logs = self._app_logs_buffer.getvalue()
+        record.completed = True
+        
+        self._request_history.appendleft(record)
+        self._current_record = None
+        
+        # Notify SSE subscribers
+        _notify_sse_subscribers(record)
+    
+    def get_history(self) -> List[Dict]:
+        """Return summary list of all recorded requests."""
+        return [r.to_summary() for r in self._request_history]
+    
+    def get_record(self, record_id: str) -> Optional[Dict]:
+        """Return full detail for a specific record."""
+        for r in self._request_history:
+            if r.id == record_id:
+                return r.to_detail()
+        return None
+    
+    def clear_history(self) -> None:
+        """Clear all request history."""
+        self._request_history.clear()
     
     # ==================== Private file writing methods ====================
     
