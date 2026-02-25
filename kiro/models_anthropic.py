@@ -45,6 +45,9 @@ class TextContentBlock(BaseModel):
 
     type: Literal["text"] = "text"
     text: str
+    cache_control: Optional[Dict[str, Any]] = None
+
+    model_config = {"extra": "allow"}
 
 
 class ThinkingContentBlock(BaseModel):
@@ -63,6 +66,9 @@ class ThinkingContentBlock(BaseModel):
     type: Literal["thinking"] = "thinking"
     thinking: str
     signature: str = ""
+    cache_control: Optional[Dict[str, Any]] = None
+
+    model_config = {"extra": "allow"}
 
 
 class ToolUseContentBlock(BaseModel):
@@ -76,6 +82,9 @@ class ToolUseContentBlock(BaseModel):
     id: str
     name: str
     input: Dict[str, Any]
+    cache_control: Optional[Dict[str, Any]] = None
+
+    model_config = {"extra": "allow"}
 
 
 class ToolResultContentBlock(BaseModel):
@@ -84,14 +93,18 @@ class ToolResultContentBlock(BaseModel):
 
     Represents the result of a tool call, sent by the user.
     Tool results can contain text, images, or a mix of both.
+
+    Content uses Any type to gracefully handle non-standard sub-block types
+    (e.g., tool_reference from Claude Code) without validation errors.
     """
 
     type: Literal["tool_result"] = "tool_result"
     tool_use_id: str
-    content: Optional[
-        Union[str, List[Union["TextContentBlock", "ImageContentBlock"]]]
-    ] = None
+    content: Optional[Any] = None
     is_error: Optional[bool] = None
+    cache_control: Optional[Dict[str, Any]] = None
+
+    model_config = {"extra": "allow"}
 
 
 # ==================================================================================================

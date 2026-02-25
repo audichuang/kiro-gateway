@@ -65,10 +65,24 @@ def convert_anthropic_content_to_text(content: Any) -> str:
         text_parts = []
         for block in content:
             if isinstance(block, dict):
-                if block.get("type") == "text":
+                block_type = block.get("type", "")
+                if block_type == "text":
                     text_parts.append(block.get("text", ""))
+                elif block_type in ("tool_use", "tool_result", "image",
+                                    "thinking", "tool_reference"):
+                    # Known non-text types - skip silently
+                    continue
+                else:
+                    # Unknown type - skip with debug log
+                    logger.debug(
+                        f"Skipping unknown content block type '{block_type}' "
+                        f"during text extraction"
+                    )
             elif hasattr(block, "type") and block.type == "text":
                 text_parts.append(block.text)
+            elif hasattr(block, "type"):
+                # Known Pydantic model but not text type - skip
+                continue
         return "".join(text_parts)
 
     return str(content) if content else ""
@@ -112,11 +126,66 @@ def extract_system_prompt(system: Any) -> str:
     return str(system)
 
 
+def _extract_text_from_tool_result_content(result_content: Any) -> str:
+    """
+    Extracts text from tool_result content, handling unknown sub-block types gracefully.
+
+    Claude Code may send non-standard content block types (e.g., tool_reference)
+    inside tool_result.content. This function extracts text from known types
+    and silently skips unknown ones.
+
+    Args:
+        result_content: The content field from a tool_result block
+
+    Returns:
+        Extracted text content
+    """
+    if isinstance(result_content, str):
+        return result_content
+
+    if isinstance(result_content, list):
+        text_parts = []
+        for item in result_content:
+            if isinstance(item, dict):
+                item_type = item.get("type", "")
+                if item_type == "text":
+                    text_parts.append(item.get("text", ""))
+                elif item_type in ("image", "image_url"):
+                    # Images are handled separately
+                    continue
+                else:
+                    # Unknown sub-block types (e.g., tool_reference)
+                    # Log and skip gracefully instead of failing
+                    logger.debug(
+                        f"Skipping unknown content block type '{item_type}' "
+                        f"in tool_result content: {item}"
+                    )
+            elif hasattr(item, "type"):
+                if getattr(item, "type", None) == "text":
+                    text_parts.append(getattr(item, "text", ""))
+                else:
+                    logger.debug(
+                        f"Skipping unknown content block type '{getattr(item, 'type', '?')}' "
+                        f"in tool_result content"
+                    )
+            elif isinstance(item, str):
+                text_parts.append(item)
+        return "".join(text_parts)
+
+    if result_content is not None:
+        return str(result_content)
+
+    return ""
+
+
 def extract_tool_results_from_anthropic_content(content: Any) -> List[Dict[str, Any]]:
     """
     Extracts tool results from Anthropic message content.
 
     Looks for content blocks with type="tool_result".
+
+    Handles non-standard content sub-block types (e.g., tool_reference from Claude Code)
+    gracefully by extracting only known text/image types and skipping unknown ones.
 
     Args:
         content: Anthropic message content (list of content blocks)
@@ -144,17 +213,14 @@ def extract_tool_results_from_anthropic_content(content: Any) -> List[Dict[str, 
             result_content = getattr(block, "content", "")
 
         if block_type == "tool_result" and tool_use_id:
-            # Convert content to text if it's a list
-            if isinstance(result_content, list):
-                result_content = extract_text_content(result_content)
-            elif not isinstance(result_content, str):
-                result_content = str(result_content) if result_content else ""
+            # Use our robust extractor that handles unknown sub-block types
+            extracted_text = _extract_text_from_tool_result_content(result_content)
 
             tool_results.append(
                 {
                     "type": "tool_result",
                     "tool_use_id": tool_use_id,
-                    "content": result_content or "(empty result)",
+                    "content": extracted_text or "(empty result)",
                 }
             )
 
@@ -199,8 +265,6 @@ def extract_images_from_tool_results(content: Any) -> List[Dict[str, Any]]:
         logger.debug(f"Extracted {len(images)} image(s) from tool_result content")
 
     return images
-
-    return tool_results
 
 
 def extract_tool_uses_from_anthropic_content(content: Any) -> List[Dict[str, Any]]:
