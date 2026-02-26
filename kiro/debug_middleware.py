@@ -82,9 +82,7 @@ class DebugLoggerMiddleware(BaseHTTPMiddleware):
         if request.url.path not in LOGGED_ENDPOINTS:
             return await call_next(request)
         
-        # Skip if debug mode is disabled
-        if DEBUG_MODE == "off":
-            return await call_next(request)
+        # (Removed DEBUG_MODE == "off" check because Dashboard needs records in memory even when file logging is off)
         
         # Import here to avoid circular imports and allow graceful degradation
         try:
@@ -111,10 +109,17 @@ class DebugLoggerMiddleware(BaseHTTPMiddleware):
             logger.warning(f"Failed to read request body for debug logging: {e}")
         
         # Continue to validation and route handler
-        # flush_on_error() or discard_buffers() will be called by:
-        # - Route handlers (for successful requests and Kiro API errors)
-        # - validation_exception_handler (for 422 validation errors)
-        # - Generic exception handlers (for other errors)
-        response = await call_next(request)
-        
-        return response
+        # flush_on_error() or discard_buffers() might be called by route handlers or exception handlers.
+        # But to ensure it's always cleaned up (e.g. for 401/404 out of route scope), we use a finally block.
+        response = None
+        try:
+            response = await call_next(request)
+            return response
+        except Exception as e:
+            if debug_logger and hasattr(debug_logger, 'flush_on_error') and debug_logger._current_record:
+                debug_logger.flush_on_error(500, str(e))
+            raise
+        finally:
+            if debug_logger and hasattr(debug_logger, 'discard_buffers') and debug_logger._current_record:
+                status = response.status_code if response else 500
+                debug_logger.discard_buffers(status)
