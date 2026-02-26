@@ -62,6 +62,7 @@ class RequestRecord:
     timestamp: float = field(default_factory=time.time)
     endpoint: str = ""
     method: str = ""
+    model_name: str = ""
     client_request_body: str = ""
     kiro_request_body: str = ""
     response_raw: str = ""
@@ -79,6 +80,7 @@ class RequestRecord:
             "timestamp": self.timestamp,
             "endpoint": self.endpoint,
             "method": self.method,
+            "model_name": self.model_name,
             "status_code": self.status_code,
             "duration_ms": round(self.duration_ms, 1),
             "has_error": self.error_info is not None,
@@ -91,6 +93,7 @@ class RequestRecord:
             "timestamp": self.timestamp,
             "endpoint": self.endpoint,
             "method": self.method,
+            "model_name": self.model_name,
             "status_code": self.status_code,
             "duration_ms": round(self.duration_ms, 1),
             "client_request_body": self.client_request_body,

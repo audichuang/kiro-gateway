@@ -1,194 +1,473 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kiro Gateway — Debug Dashboard</title>
-<style>
-  :root {
-    --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2333;
-    --bg-selected: #1f2937; --border: #30363d; --text: #e6edf3;
-    --text-dim: #8b949e; --text-muted: #484f58;
-    --accent: #58a6ff; --accent-dim: #1f6feb;
-    --green: #3fb950; --red: #f85149; --yellow: #d29922;
-    --orange: #db6d28;
-    --font: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
-    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --radius: 8px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: var(--font-ui); background: var(--bg); color: var(--text);
-    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiro Gateway — Debug Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --bg-hover: #1c2333;
+      --bg-selected: #1f2937;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --text-muted: #484f58;
+      --accent: #58a6ff;
+      --accent-dim: #1f6feb;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --orange: #db6d28;
+      --font: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+      --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --radius: 8px;
+    }
 
-  /* Header */
-  .header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 20px; border-bottom: 1px solid var(--border);
-    background: var(--bg-card); flex-shrink: 0;
-  }
-  .header h1 {
-    font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;
-  }
-  .header h1 .ghost { font-size: 20px; }
-  .header-actions { display: flex; gap: 8px; align-items: center; }
-  .badge {
-    font-size: 11px; padding: 2px 8px; border-radius: 10px;
-    background: var(--accent-dim); color: var(--accent); font-weight: 500;
-  }
-  .badge.live { background: rgba(63,185,80,0.15); color: var(--green); }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  /* Layout */
-  .main { display: flex; flex: 1; overflow: hidden; }
-  .sidebar {
-    width: 340px; min-width: 280px; border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; background: var(--bg-card);
-  }
-  .sidebar-header {
-    padding: 12px 16px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    font-size: 12px; color: var(--text-dim);
-  }
-  .list { flex: 1; overflow-y: auto; }
-  .list-item {
-    padding: 10px 16px; border-bottom: 1px solid var(--border);
-    cursor: pointer; transition: background 0.15s;
-  }
-  .list-item:hover { background: var(--bg-hover); }
-  .list-item.selected { background: var(--bg-selected); border-left: 3px solid var(--accent); }
-  .list-item.error { border-left: 3px solid var(--red); }
-  .list-item.error.selected { border-left: 3px solid var(--red); background: rgba(248,81,73,0.08); }
-  .list-row { display: flex; justify-content: space-between; align-items: center; }
-  .list-endpoint {
-    font-family: var(--font); font-size: 12px; font-weight: 500;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;
-  }
-  .list-method {
-    font-size: 10px; padding: 1px 5px; border-radius: 3px;
-    font-weight: 600; margin-right: 6px;
-    background: rgba(88,166,255,0.15); color: var(--accent);
-  }
-  .list-time { font-size: 11px; color: var(--text-dim); }
-  .list-meta { display: flex; gap: 12px; margin-top: 4px; font-size: 11px; color: var(--text-muted); }
-  .status-ok { color: var(--green); font-weight: 600; }
-  .status-err { color: var(--red); font-weight: 600; }
-  .list-empty {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 60px 20px; color: var(--text-muted); text-align: center; height: 100%;
-  }
-  .list-empty .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-  /* Detail panel */
-  .detail { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .detail-empty {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; color: var(--text-muted);
-  }
-  .detail-empty .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.2; }
-  .tabs {
-    display: flex; border-bottom: 1px solid var(--border);
-    background: var(--bg-card); flex-shrink: 0; overflow-x: auto;
-  }
-  .tab {
-    padding: 10px 18px; font-size: 12px; font-weight: 500;
-    cursor: pointer; border-bottom: 2px solid transparent;
-    color: var(--text-dim); transition: all 0.15s; white-space: nowrap;
-    background: none; border-top: none; border-left: none; border-right: none;
-  }
-  .tab:hover { color: var(--text); background: var(--bg-hover); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .tab-content {
-    flex: 1; overflow: auto; padding: 0;
-  }
-  .code-view {
-    font-family: var(--font); font-size: 12px; line-height: 1.6;
-    padding: 16px 20px; white-space: pre-wrap; word-break: break-all;
-    color: var(--text); tab-size: 2;
-  }
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+      flex-shrink: 0;
+    }
 
-  /* JSON syntax highlighting */
-  .json-key { color: #79c0ff; }
-  .json-string { color: #a5d6ff; }
-  .json-number { color: #d2a8ff; }
-  .json-boolean { color: #ff7b72; }
-  .json-null { color: var(--text-muted); }
-  .json-bracket { color: var(--text-dim); }
+    .header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-  /* Buttons */
-  .btn {
-    padding: 5px 12px; font-size: 12px; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
-    cursor: pointer; transition: all 0.15s; font-family: var(--font-ui);
-  }
-  .btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
-  .btn-danger { color: var(--red); }
-  .btn-danger:hover { background: rgba(248,81,73,0.1); border-color: var(--red); }
+    .header h1 .ghost {
+      font-size: 20px;
+    }
 
-  /* Detail header */
-  .detail-header {
-    padding: 12px 20px; border-bottom: 1px solid var(--border);
-    background: var(--bg-card); display: flex; align-items: center; gap: 12px;
-    flex-shrink: 0;
-  }
-  .detail-header .method { font-size: 11px; padding: 2px 6px; border-radius: 4px;
-    font-weight: 700; background: rgba(88,166,255,0.15); color: var(--accent); }
-  .detail-header .path { font-family: var(--font); font-size: 13px; font-weight: 500; }
-  .detail-header .meta { margin-left: auto; font-size: 12px; color: var(--text-dim); display: flex; gap: 16px; }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-weight: 500;
+    }
 
-  /* Animations */
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-  .list-item { animation: fadeIn 0.2s ease; }
+    .badge.live {
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--green);
+    }
 
-  /* Dot indicator */
-  .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
-  .dot.green { background: var(--green); }
-  .dot.red { background: var(--red); }
-</style>
+    /* Layout */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 340px;
+      min-width: 280px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-card);
+    }
+
+    .sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .list-item {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .list-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .list-item.selected {
+      background: var(--bg-selected);
+      border-left: 3px solid var(--accent);
+    }
+
+    .list-item.error {
+      border-left: 3px solid var(--red);
+    }
+
+    .list-item.error.selected {
+      border-left: 3px solid var(--red);
+      background: rgba(248, 81, 73, 0.08);
+    }
+
+    .list-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .list-endpoint {
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .list-model {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: var(--font-ui);
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-dim);
+      margin-left: 6px;
+    }
+
+    .list-method {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+      margin-right: 6px;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+    }
+
+    .list-time {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .list-meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .status-ok {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .status-err {
+      color: var(--red);
+      font-weight: 600;
+    }
+
+    .list-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      text-align: center;
+      height: 100%;
+    }
+
+    .list-empty .icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      opacity: 0.3;
+    }
+
+    /* Detail panel */
+    .detail {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .detail-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-muted);
+    }
+
+    .detail-empty .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.2;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+
+    .tab {
+      padding: 10px 18px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: var(--text-dim);
+      transition: all 0.15s;
+      white-space: nowrap;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+
+    .tab:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content {
+      flex: 1;
+      overflow: auto;
+      padding: 0;
+    }
+
+    .code-view {
+      font-family: var(--font);
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 16px 20px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text);
+      tab-size: 2;
+    }
+
+    /* JSON syntax highlighting */
+    .json-key {
+      color: #79c0ff;
+    }
+
+    .json-string {
+      color: #a5d6ff;
+    }
+
+    .json-number {
+      color: #d2a8ff;
+    }
+
+    .json-boolean {
+      color: #ff7b72;
+    }
+
+    .json-null {
+      color: var(--text-muted);
+    }
+
+    .json-bracket {
+      color: var(--text-dim);
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 5px 12px;
+      font-size: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-ui);
+    }
+
+    .btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--text-muted);
+    }
+
+    .btn-danger {
+      color: var(--red);
+    }
+
+    .btn-danger:hover {
+      background: rgba(248, 81, 73, 0.1);
+      border-color: var(--red);
+    }
+
+    /* Detail header */
+    .detail-header {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .detail-header .method {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+    }
+
+    .detail-header .path {
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .detail-header .meta {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 16px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--text-muted);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-dim);
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .list-item {
+      animation: fadeIn 0.2s ease;
+    }
+
+    /* Dot indicator */
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    .dot.green {
+      background: var(--green);
+    }
+
+    .dot.red {
+      background: var(--red);
+    }
+  </style>
 </head>
+
 <body>
 
-<div class="header">
-  <h1><span class="ghost">👻</span> Kiro Gateway — Debug Dashboard</h1>
-  <div class="header-actions">
-    <span class="badge live" id="sseStatus">● Connecting...</span>
-    <button class="btn btn-danger" onclick="clearHistory()">Clear All</button>
-  </div>
-</div>
-
-<div class="main">
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <span>Requests <span id="requestCount" style="color:var(--accent)">(0)</span></span>
-      <button class="btn" onclick="refreshHistory()" style="padding:3px 8px;font-size:11px">↻ Refresh</button>
+  <div class="header">
+    <h1><span class="ghost">👻</span> Kiro Gateway — Debug Dashboard</h1>
+    <div class="header-actions">
+      <span class="badge live" id="sseStatus">● Connecting...</span>
+      <button class="btn btn-danger" onclick="clearHistory()">Clear All</button>
     </div>
-    <div class="list" id="requestList">
-      <div class="list-empty">
-        <div class="icon">📡</div>
-        <div>No requests yet</div>
-        <div style="margin-top:8px;font-size:12px">Send a request to /v1/chat/completions or /v1/messages</div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <span>Requests <span id="requestCount" style="color:var(--accent)">(0)</span></span>
+        <button class="btn" onclick="refreshHistory()" style="padding:3px 8px;font-size:11px">↻ Refresh</button>
+      </div>
+      <div class="list" id="requestList">
+        <div class="list-empty">
+          <div class="icon">📡</div>
+          <div>No requests yet</div>
+          <div style="margin-top:8px;font-size:12px">Send a request to /v1/chat/completions or /v1/messages</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail" id="detailPanel">
+      <div class="detail-empty">
+        <div class="icon">🔍</div>
+        <div style="font-size:14px">Select a request to view details</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+          Request/Response JSON, SSE streams, and application logs
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="detail" id="detailPanel">
-    <div class="detail-empty">
-      <div class="icon">🔍</div>
-      <div style="font-size:14px">Select a request to view details</div>
-      <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
-        Request/Response JSON, SSE streams, and application logs
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
+  <script>
 const API_BASE = '/debug/api';
 let selectedId = null;
 let records = [];
@@ -243,7 +522,11 @@ function renderList() {
     if (isErr) cls.push('error');
     return `<div class="${cls.join(' ')}" onclick="selectRecord('${r.id}')" data-id="${r.id}">
       <div class="list-row">
-        <div><span class="list-method">${r.method || 'POST'}</span><span class="list-endpoint">${r.endpoint}</span></div>
+        <div>
+          <span class="list-method">${r.method || 'POST'}</span>
+          <span class="list-endpoint">${r.endpoint}</span>
+          ${r.model_name ? `<span class="list-model">${r.model_name}</span>` : ''}
+        </div>
         <span class="list-time">${formatTime(r.timestamp)}</span>
       </div>
       <div class="list-meta">
@@ -290,6 +573,7 @@ function renderDetail(data) {
     <div class="detail-header">
       <span class="method">${data.method || 'POST'}</span>
       <span class="path">${data.endpoint}</span>
+      ${data.model_name ? `<span class="badge" style="margin-left: 8px; background: rgba(255,255,255,0.1); color: var(--text-dim); font-weight: normal;">${data.model_name}</span>` : ''}
       <div class="meta">
         <span class="${statusClass(data.status_code)}">${data.status_code || '—'}</span>
         <span>${data.duration_ms ? data.duration_ms + 'ms' : '—'}</span>
@@ -399,6 +683,7 @@ function connectSSE() {
 // --- Init ---
 refreshHistory();
 connectSSE();
-</script>
+  </script>
 </body>
+
 </html>

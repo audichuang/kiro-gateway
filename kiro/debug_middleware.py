@@ -105,6 +105,15 @@ class DebugLoggerMiddleware(BaseHTTPMiddleware):
             body = await request.body()
             if body:
                 debug_logger.log_request_body(body)
+                
+                # Extract model name for Dashboard
+                try:
+                    import json
+                    body_json = json.loads(body)
+                    if isinstance(body_json, dict) and "model" in body_json and debug_logger._current_record:
+                        debug_logger._current_record.model_name = str(body_json["model"])
+                except Exception:
+                    pass
         except Exception as e:
             logger.warning(f"Failed to read request body for debug logging: {e}")
         
