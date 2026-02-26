@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kiro Gateway — Debug Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg-page: #09090b;
@@ -51,25 +52,9 @@
       display: flex;
       flex-direction: column;
       overflow-y: scroll;
-      /* prevent layout shift on scroll */
     }
 
-    /* Typography */
-    h1 {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    h1 .ghost {
-      font-size: 22px;
-      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
-    }
-
-    /* Header */
+    /* Header & Tabs */
     .header {
       position: sticky;
       top: 0;
@@ -77,10 +62,62 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 32px;
-      background: rgba(9, 9, 11, 0.8);
+      padding: 12px 32px;
+      background: rgba(9, 9, 11, 0.85);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    h1 .ghost {
+      font-size: 20px;
+      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+    }
+
+    .nav-tab.active {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
     .header-actions {
@@ -130,7 +167,6 @@
       }
     }
 
-    /* Buttons */
     .btn {
       padding: 8px 16px;
       font-size: 13px;
@@ -178,6 +214,29 @@
       flex-direction: column;
     }
 
+    .view-container {
+      display: none;
+      flex-direction: column;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .view-container.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(5px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ---- Live View ---- */
     .list-header {
       display: flex;
       justify-content: space-between;
@@ -200,7 +259,6 @@
       margin-left: 8px;
     }
 
-    /* Request List Cards */
     .request-list {
       display: flex;
       flex-direction: column;
@@ -237,7 +295,6 @@
       padding-left: 16px;
     }
 
-    /* Card Layout */
     .col-status {
       text-align: center;
       min-width: 50px;
@@ -339,6 +396,7 @@
     .empty-state .icon {
       font-size: 48px;
       opacity: 0.3;
+      margin-bottom: 8px;
     }
 
     .empty-state h3 {
@@ -352,6 +410,125 @@
       color: var(--text-muted);
       max-width: 400px;
       line-height: 1.5;
+    }
+
+    /* ---- Analytics View ---- */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stat-card .label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      letter-spacing: -0.02em;
+    }
+
+    .stat-card .value small {
+      font-size: 14px;
+      color: var(--text-dim);
+      font-weight: 400;
+      margin-left: 4px;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-card h3 {
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 24px;
+      color: var(--text-main);
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px;
+      width: 100%;
+    }
+
+    .model-list {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .model-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .model-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .model-name {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-main);
+    }
+
+    .model-stats {
+      text-align: right;
+    }
+
+    .model-stats .tokens {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .model-stats .reqs {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
     }
 
     /* ---------------- Modal (彈窗) ---------------- */
@@ -395,7 +572,6 @@
       opacity: 1;
     }
 
-    /* Modal Header */
     .modal-header {
       padding: 20px 24px;
       border-bottom: 1px solid var(--border);
@@ -463,7 +639,6 @@
       background: var(--bg-surface-hover);
     }
 
-    /* Modal Body */
     .modal-body {
       flex: 1;
       display: flex;
@@ -471,7 +646,6 @@
       overflow: hidden;
     }
 
-    /* Tabs in Modal */
     .tabs {
       display: flex;
       border-bottom: 1px solid var(--border);
@@ -503,7 +677,6 @@
       border-bottom-color: var(--accent);
     }
 
-    /* Tab Content */
     .tab-content {
       flex: 1;
       overflow: auto;
@@ -559,7 +732,6 @@
       color: #a1a1aa;
     }
 
-    /* Custom Scrollbar */
     ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
@@ -583,47 +755,80 @@
 <body>
 
   <div class="header">
-    <h1><span class="ghost">👻</span> Kiro Gateway — Debug Dashboard</h1>
+    <div class="header-left">
+      <h1><span class="ghost">👻</span> Kiro Gateway</h1>
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tabLive" onclick="switchView('live')">📋 Live Requests</button>
+        <button class="nav-tab" id="tabAnalytics" onclick="switchView('analytics')">📊 Analytics</button>
+      </div>
+    </div>
     <div class="header-actions">
       <span class="badge live" id="sseStatus">Connecting...</span>
-      <button class="btn btn-danger" onclick="clearHistory()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 6h18"></path>
-          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-        </svg>
-        Clear History
-      </button>
+      <button class="btn btn-danger" id="btnClear" onclick="clearHistory()">Clear History</button>
     </div>
   </div>
 
   <div class="container">
-    <div class="list-header">
-      <div class="list-title">Recent API Requests <span id="requestCount">0</span></div>
-      <button class="btn" onclick="refreshHistory()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-8.31l5.67-5.67" />
-        </svg>
-        Refresh
-      </button>
-    </div>
 
-    <div class="request-list" id="requestList">
-      <!-- Rendered via JS -->
-    </div>
-  </div>
-
-  <!-- Modal Overlay -->
-  <div class="modal-overlay" id="modalOverlay" onclick="handleBackdropClick(event)">
-    <div class="modal-dialog">
-      <div class="modal-header" id="modalHeader">
+    <!-- ====== Live View ====== -->
+    <div id="viewLive" class="view-container active">
+      <div class="list-header">
+        <div class="list-title">Recent Event History <span id="requestCount">0</span></div>
+        <button class="btn" onclick="refreshHistory()">Refresh</button>
+      </div>
+      <div class="request-list" id="requestList">
         <!-- Rendered via JS -->
       </div>
-      <div class="modal-body">
-        <div class="tabs" id="tabBar">
-          <!-- Rendered via JS -->
+    </div>
+
+    <!-- ====== Analytics View ====== -->
+    <div id="viewAnalytics" class="view-container">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="label">🚀 Total Requests</div>
+          <div class="value" id="statTotalReqs">0</div>
         </div>
+        <div class="stat-card">
+          <div class="label">🪙 Total Tokens Used</div>
+          <div class="value" id="statTotalTokens">0<small>tokens</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">📥 Prompt Tokens</div>
+          <div class="value" id="statPromptTokens">0<small>tokens</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="label">📤 Completion Tokens</div>
+          <div class="value" id="statCompletionTokens">0<small>tokens</small></div>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>Token Usage Trend (Last 24h)</h3>
+          <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>Model Distribution</h3>
+          <div class="chart-container" style="height: 200px;">
+            <canvas id="modelChart"></canvas>
+          </div>
+          <div class="model-list" id="modelListHtml">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ====== Modal Overlay ====== -->
+  <div class="modal-overlay" id="modalOverlay" onclick="handleBackdropClick(event)">
+    <div class="modal-dialog">
+      <div class="modal-header" id="modalHeader"></div>
+      <div class="modal-body">
+        <div class="tabs" id="tabBar"></div>
         <div class="tab-content" id="tabContent"></div>
       </div>
     </div>
@@ -634,11 +839,36 @@
     let records = [];
     let activeRecordData = null;
 
+    // Chart.js instances
+    let trendChartInstance = null;
+    let modelChartInstance = null;
+
+    // --- View Switching ---
+    function switchView(viewName) {
+      document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+
+      const isAnalytics = viewName === 'analytics';
+      document.getElementById(isAnalytics ? 'viewAnalytics' : 'viewLive').classList.add('active');
+      document.getElementById(isAnalytics ? 'tabAnalytics' : 'tabLive').classList.add('active');
+
+      if (isAnalytics) {
+        document.getElementById('btnClear').style.display = 'none';
+        refreshAnalytics();
+      } else {
+        document.getElementById('btnClear').style.display = 'inline-flex';
+      }
+    }
+
     // --- Utilities ---
     function formatTime(ts) {
       const d = new Date(ts * 1000);
       const pad = (n) => n.toString().padStart(2, '0');
-      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${d.getMilliseconds().toString().padStart(3, '0')}`;
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function formatNumber(num) {
+      return new Intl.NumberFormat('en-US').format(num);
     }
 
     function syntaxHighlight(json) {
@@ -666,7 +896,7 @@
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    // --- List View Rendering ---
+    // --- Live View Rendering ---
     function renderList() {
       const list = document.getElementById('requestList');
       document.getElementById('requestCount').textContent = records.length;
@@ -676,7 +906,7 @@
       <div class="empty-state">
         <div class="icon">📡</div>
         <h3>Waiting for Requests</h3>
-        <p>Send an API request to <code>/v1/chat/completions</code> or <code>/v1/messages</code> through the gateway to see it appear here in real-time.</p>
+        <p>Send an API request through the gateway to see it appear here in real-time.</p>
       </div>`;
         return;
       }
@@ -685,6 +915,9 @@
         const isErr = r.has_error || r.status_code >= 400;
         const borderClass = isErr ? 'error' : 'success';
         const statusClass = isErr ? 'err' : 'ok';
+
+        // Calculate tokens
+        const totalTokens = (r.prompt_tokens || 0) + (r.completion_tokens || 0);
 
         return `
       <div class="request-card ${borderClass}" onclick="openModal('${r.id}')">
@@ -699,6 +932,7 @@
           <div class="row-bottom">
             ${r.model_name ? `<span class="req-model">${r.model_name}</span>` : ''}
             <span class="req-time">${formatTime(r.timestamp)}</span>
+            ${totalTokens > 0 ? `<span style="font-size: 11px; color: var(--text-dim);">✦ ${formatNumber(totalTokens)} tk</span>` : ''}
           </div>
         </div>
         <div class="col-meta">
@@ -709,11 +943,107 @@
       }).join('');
     }
 
+    // --- Analytics View Rendering ---
+    async function refreshAnalytics() {
+      try {
+        const resp = await fetch(`${API_BASE}/analytics?hours=24`);
+        if (!resp.ok) throw new Error("Failed to fetch analytics");
+        const data = await resp.json();
+        renderAnalytics(data);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderAnalytics(data) {
+      const { summary, trend } = data;
+
+      // Update Stats Cards
+      document.getElementById('statTotalReqs').textContent = formatNumber(summary.total_requests);
+      document.getElementById('statTotalTokens').innerHTML = `${formatNumber(summary.total_tokens)}<small>tokens</small>`;
+      document.getElementById('statPromptTokens').innerHTML = `${formatNumber(summary.total_prompt_tokens)}<small>tokens</small>`;
+      document.getElementById('statCompletionTokens').innerHTML = `${formatNumber(summary.total_completion_tokens)}<small>tokens</small>`;
+
+      // Model List HTML
+      const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
+      document.getElementById('modelListHtml').innerHTML = summary.models.map((m, i) => `
+    <div class="model-item">
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${colors[i % colors.length]}"></span>
+        <span class="model-name">${m.model}</span>
+      </div>
+      <div class="model-stats">
+        <div class="tokens">${formatNumber(m.tokens)} tk</div>
+        <div class="reqs">${formatNumber(m.requests)} reqs</div>
+      </div>
+    </div>
+  `).join('');
+
+      // Setup Chart Options (Dark Theme)
+      Chart.defaults.color = '#a1a1aa';
+      Chart.defaults.borderColor = '#27272a';
+      Chart.defaults.font.family = "'Inter', sans-serif";
+
+      // Render Trend Chart (Area Chart)
+      const trendCtx = document.getElementById('trendChart').getContext('2d');
+      if (trendChartInstance) trendChartInstance.destroy();
+
+      trendChartInstance = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+          labels: trend.map(t => t.hour.split(' ')[1]), // Extract only HH:MM
+          datasets: [{
+            label: 'Tokens Consumed',
+            data: trend.map(t => t.tokens),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2,
+            pointHoverRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // Render Model Chart (Doughnut)
+      const modelCtx = document.getElementById('modelChart').getContext('2d');
+      if (modelChartInstance) modelChartInstance.destroy();
+
+      modelChartInstance = new Chart(modelCtx, {
+        type: 'doughnut',
+        data: {
+          labels: summary.models.map(m => m.model),
+          datasets: [{
+            data: summary.models.map(m => m.tokens),
+            backgroundColor: colors,
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '75%',
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
     // --- Modal Logic ---
     async function openModal(id) {
       const overlay = document.getElementById('modalOverlay');
       overlay.classList.add('open');
-      document.body.style.overflow = 'hidden'; // prevent bg body scrolling
+      document.body.style.overflow = 'hidden';
 
       document.getElementById('modalHeader').innerHTML = '<div style="color:var(--text-dim)">Loading request details...</div>';
       document.getElementById('tabBar').innerHTML = '';
@@ -725,10 +1055,7 @@
         const data = await resp.json();
         renderModalContent(data);
       } catch (e) {
-        document.getElementById('modalHeader').innerHTML = `
-      <div style="color:var(--red); font-size:16px;">Failed to load details: ${e.message}</div>
-      <button class="close-btn" onclick="closeModal()">×</button>
-    `;
+        document.getElementById('modalHeader').innerHTML = `<div style="color:var(--red); font-size:16px;">Failed to load details: ${e.message}</div><button class="close-btn" onclick="closeModal()">×</button>`;
       }
     }
 
@@ -738,24 +1065,14 @@
       activeRecordData = null;
     }
 
-    function handleBackdropClick(event) {
-      if (event.target === document.getElementById('modalOverlay')) {
-        closeModal();
-      }
-    }
-
-    // Support ESC key to close
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && document.getElementById('modalOverlay').classList.contains('open')) {
-        closeModal();
-      }
-    });
+    function handleBackdropClick(event) { if (event.target === document.getElementById('modalOverlay')) closeModal(); }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.getElementById('modalOverlay').classList.contains('open')) closeModal(); });
 
     function renderModalContent(data) {
       activeRecordData = data;
       const isErr = data.error_info || data.status_code >= 400;
+      const totalTokens = (data.prompt_tokens || 0) + (data.completion_tokens || 0);
 
-      // Header
       document.getElementById('modalHeader').innerHTML = `
     <div class="modal-header-info">
       <div class="modal-title-row">
@@ -766,14 +1083,15 @@
       <div class="modal-meta-row">
         <div class="modal-meta-item">Status: <strong style="color:var(--${isErr ? 'red' : 'green'})">${data.status_code || 'N/A'}</strong></div>
         <div class="modal-meta-item">Duration: <strong>${data.duration_ms ? data.duration_ms + 'ms' : '—'}</strong></div>
+        <div class="modal-meta-item">Tokens: <strong style="color:var(--accent)">${totalTokens}</strong> 
+          <span style="color:var(--text-dim); font-weight:normal; font-size:11px;">(P: ${data.prompt_tokens || 0}, C: ${data.completion_tokens || 0})</span>
+        </div>
         <div class="modal-meta-item">Time: <strong>${formatTime(data.timestamp)}</strong></div>
-        <div class="modal-meta-item">ID: <strong style="color:var(--text-dim)">${data.id}</strong></div>
       </div>
     </div>
     <button class="close-btn" onclick="closeModal()">×</button>
   `;
 
-      // Tabs Definition
       const tabs = [
         { id: 'client', label: 'Client Request', content: data.client_request_body },
         { id: 'kiro', label: 'Gateway Request', content: data.kiro_request_body },
@@ -781,29 +1099,17 @@
         { id: 'modified', label: 'Response (Modified)', content: data.response_modified },
         { id: 'logs', label: 'Internal Logs', content: data.app_logs },
       ];
-      if (data.error_info) {
-        tabs.push({ id: 'error', label: 'Error Trace', content: JSON.stringify(data.error_info, null, 2) });
-      }
+      if (data.error_info) tabs.push({ id: 'error', label: 'Error Trace', content: JSON.stringify(data.error_info, null, 2) });
 
-      // Store data globally for tab switching
       window._modalTabsData = tabs.reduce((acc, tab) => { acc[tab.id] = tab.content; return acc; }, {});
-
-      // Render Tab Bar
-      document.getElementById('tabBar').innerHTML = tabs.map((t, i) =>
-        `<button class="tab${i === 0 ? ' active' : ''}" id="tab-btn-${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>`
-      ).join('');
-
-      // Default select first tab
+      document.getElementById('tabBar').innerHTML = tabs.map((t, i) => `<button class="tab${i === 0 ? ' active' : ''}" id="tab-btn-${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>`).join('');
       switchTab(tabs[0].id);
     }
 
     function switchTab(tabId) {
       const content = window._modalTabsData?.[tabId] || '';
-
-      // Update Active Class
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById(`tab-btn-${tabId}`).classList.add('active');
-
       const container = document.getElementById('tabContent');
 
       if (!content || !content.trim()) {
@@ -823,28 +1129,7 @@
       }
     }
 
-    // --- API Calls & SSE ---
-    async function refreshHistory() {
-      try {
-        const resp = await fetch(`${API_BASE}/history`);
-        records = await resp.json();
-        renderList();
-      } catch (e) {
-        console.error('Failed to fetch history:', e);
-      }
-    }
-
-    async function clearHistory() {
-      if (!confirm("Are you sure you want to clear all recorded requests?")) return;
-      try {
-        await fetch(`${API_BASE}/history`, { method: 'DELETE' });
-        records = [];
-        renderList();
-      } catch (e) {
-        console.error('Failed to clear history:', e);
-      }
-    }
-
+    // --- Init SSE & Data ---
     function connectSSE() {
       const badge = document.getElementById('sseStatus');
       const badgeEl = badge.parentElement;
@@ -862,11 +1147,14 @@
           const data = JSON.parse(event.data);
           if (data.type === 'connected') return;
 
-          // Upsert record
           const existing = records.findIndex(r => r.id === data.id);
           if (existing >= 0) records.splice(existing, 1);
           records.unshift(data);
-          renderList();
+
+          // Only re-render list if currently viewing live
+          if (document.getElementById('viewLive').classList.contains('active')) {
+            renderList();
+          }
         } catch (e) {
           console.error('SSE parse error:', e);
         }
@@ -883,6 +1171,23 @@
     }
 
     // --- Init ---
+    async function refreshHistory() {
+      try {
+        const resp = await fetch(`${API_BASE}/history`);
+        records = await resp.json();
+        renderList();
+      } catch (e) { console.error('Failed to fetch history:', e); }
+    }
+
+    async function clearHistory() {
+      if (!confirm("Are you sure you want to clear all recorded requests?")) return;
+      try {
+        await fetch(`${API_BASE}/history`, { method: 'DELETE' });
+        records = [];
+        renderList();
+      } catch (e) { console.error('Failed to clear history:', e); }
+    }
+
     refreshHistory();
     connectSSE();
   </script>

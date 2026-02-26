@@ -69,6 +69,8 @@ class RequestRecord:
     response_modified: str = ""
     app_logs: str = ""
     error_info: Optional[Dict[str, Any]] = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
     status_code: int = 0
     duration_ms: float = 0
     completed: bool = False
@@ -81,6 +83,8 @@ class RequestRecord:
             "endpoint": self.endpoint,
             "method": self.method,
             "model_name": self.model_name,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
             "status_code": self.status_code,
             "duration_ms": round(self.duration_ms, 1),
             "has_error": self.error_info is not None,
@@ -94,6 +98,8 @@ class RequestRecord:
             "endpoint": self.endpoint,
             "method": self.method,
             "model_name": self.model_name,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
             "status_code": self.status_code,
             "duration_ms": round(self.duration_ms, 1),
             "client_request_body": self.client_request_body,
@@ -492,6 +498,48 @@ class DebugLogger:
         record.duration_ms = (time.time() - self._request_start_time) * 1000
         record.app_logs = self._app_logs_buffer.getvalue()
         record.completed = True
+        
+        # Calculate tokens
+        try:
+            from kiro.utils.token_counter import estimate_request_tokens, estimate_response_tokens
+            import json
+            
+            if record.kiro_request_body:
+                try:
+                    req_json = json.loads(record.kiro_request_body)
+                    record.prompt_tokens = estimate_request_tokens(req_json)
+                except json.JSONDecodeError:
+                    pass
+            elif record.client_request_body:
+                try:
+                    req_json = json.loads(record.client_request_body)
+                    record.prompt_tokens = estimate_request_tokens(req_json)
+                except json.JSONDecodeError:
+                    pass
+            
+            if record.response_modified:
+                record.completion_tokens = estimate_response_tokens([record.response_modified])
+            elif record.response_raw:
+                record.completion_tokens = estimate_response_tokens([record.response_raw])
+                
+        except Exception as e:
+            logger.error(f"[DebugLogger] Token estimation error: {e}")
+            
+        # Record into analytics database
+        try:
+            from kiro.analytics_db import analytics_db
+            analytics_db.record_usage(
+                record_id=record.id,
+                timestamp=record.timestamp,
+                endpoint=record.endpoint,
+                model=record.model_name,
+                prompt_tokens=record.prompt_tokens,
+                completion_tokens=record.completion_tokens,
+                duration_ms=record.duration_ms,
+                status_code=record.status_code
+            )
+        except Exception as e:
+            logger.error(f"[DebugLogger] DB Analytics tracking error: {e}")
         
         self._request_history.appendleft(record)
         self._current_record = None

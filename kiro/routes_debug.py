@@ -56,6 +56,18 @@ async def clear_history():
     return JSONResponse(content={"status": "ok"})
 
 
+@router.get("/api/analytics")
+async def get_analytics(hours: int = 24):
+    """Return long-term analytics summary and trend data."""
+    try:
+        from kiro.analytics_db import analytics_db
+        summary = analytics_db.get_summary_stats()
+        trend = analytics_db.get_trend_data(hours=hours)
+        return JSONResponse(content={"summary": summary, "trend": trend})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
 @router.get("/api/stream")
 async def sse_stream():
     """
